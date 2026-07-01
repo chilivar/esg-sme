@@ -1,0 +1,117 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: business_mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: business_sustainability
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3313:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - shared_net
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: business_phpmyadmin
+    restart: always
+    ports:
+      - "8082:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: root
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - shared_net
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: business_rabbit
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - shared_net
+
+  analytics-service:
+    image: chilivardev/analytics-service:latest
+    container_name: analytics_service
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/business_sustainability?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+      SPRINGDOC_API_DOCS_ENABLED: "true"
+      SPRINGDOC_SWAGGER_UI_ENABLED: "true"
+      AI_KEY: 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
+      AI_MODEL: gpt-4.1-mini
+      AI_URL: https://api.openai.com/v1/chat/completions
+    ports:
+      - "8083:8083"
+    networks:
+      - shared_net
+
+  news-parser-service:
+    image: chilivardev/news-parser-service:latest
+    container_name: news_parser_service
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/business_sustainability?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRINGDOC_API_DOCS_ENABLED: "true"
+      SPRINGDOC_SWAGGER_UI_ENABLED: "true"
+      YANDEX_TRANSLATE_URL: https://translate.api.cloud.yandex.net/translate/v2/translate
+      YANDEX_TRANSLATE_FOLDER_ID: b1gp1g2mdlpi2c1hhmv4
+      YANDEX_TRANSLATE_API_KEY: AQVN3-a6J8IzFAX3EsxLnZgsQFrrhMjFVSlG_ES4
+    ports:
+      - "8081:8080"
+    networks:
+      - shared_net
+
+  recsys:
+    image: yuribeton/recsystem
+    container_name: recomendation_system
+    ports:
+      - "5000:5000"
+    networks:
+      - shared_net
+
+volumes:
+  mysql_data:
+
+networks:
+  shared_net:
+    driver: bridge
