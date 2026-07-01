@@ -1,6 +1,69 @@
-version: "3.9"
-
 services:
+  redis:
+    image: redis:7
+    networks:
+      - shared_net
+
+  celery:
+      image: drakenejivoy/sdg-celery:latest
+      command: celery -A SDG_for_buisness worker -l info
+      restart: always
+      networks:
+        - shared_net
+      depends_on:
+        - redis
+      environment:
+        - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
+        - DATABASE_URL=mysql://admin:admin@db:3306/sdg
+        - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
+
+  db:
+    image: mysql:8
+    container_name: sdg_portal-db-1
+    restart: always
+    networks:
+      - shared_net
+    environment:
+      MYSQL_DATABASE: sdg
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data_gateway:/var/lib/mysql
+    healthcheck:
+        test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uadmin", "-padmin" ]
+        interval: 5s
+        timeout: 5s
+        retries: 10
+
+  web:
+    image: drakenejivoy/sdg_gateway:latest
+    container_name: sdg_gateway
+    restart: always
+    networks:
+      - shared_net
+#    volumes:
+#      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
+      - DATABASE_URL=mysql://admin:admin@db:3306/sdg
+      - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
+
+  recsys:
+    image: yuribeton/recsystem
+    container_name: recomendation_system
+    ports:
+      - "5000:5000"
+    networks:
+      - shared_net
+
   mysql:
     image: mysql:8.0
     container_name: business_mysql
@@ -11,7 +74,7 @@ services:
     ports:
       - "3313:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_data_business:/var/lib/mysql
       - ./db:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
@@ -101,16 +164,40 @@ services:
     networks:
       - shared_net
 
-  recsys:
-    image: yuribeton/recsystem
-    container_name: recomendation_system
+  mail-service:
+    image: chilivardev/mail-service:latest
+    container_name: mail-service
+    restart: always
+    environment:
+      MAIL_USERNAME: "portalcur@gmail.com"
+      MAIL_PASSWORD: "smla qvcj jbkf dapb"
+      MAILING_USERS_API_KEY: "0e56293c53afb5937cbbc9cd7d8975b810d5b60e732b49e5be6313533d2ce7e9"
+      MAILING_USERS_URL: "http://web:8000/api/mailing-users/"
     ports:
-      - "5000:5000"
+      - "8089:8089"
+    networks:
+      - shared_net
+
+  frontend:
+    image: avomi/dip-frontend:latest
+    container_name: dip-frontend-container
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    environment:
+      - REACT_APP_PORTAL_API_URL=http://localhost:8000
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:80" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - shared_net
 
 volumes:
-  mysql_data:
+  mysql_data_gateway:
+  mysql_data_business:
 
 networks:
   shared_net:
