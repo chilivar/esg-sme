@@ -170,7 +170,7 @@ services:
 
   mail-service:
     build:
-      context: ./mail-service
+      context: ./Mail-Service
       dockerfile: Dockerfile
     container_name: mail-service
     restart: always
@@ -208,4 +208,3 @@ volumes:
 networks:
   shared_net:
     driver: bridge
-    
