@@ -139,8 +139,6 @@ services:
       SPRING_RABBITMQ_PASSWORD: guest
       SPRINGDOC_API_DOCS_ENABLED: "true"
       SPRINGDOC_SWAGGER_UI_ENABLED: "true"
-      AI_KEY: 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
-      AI_MODEL: gpt-4.1-mini
     ports:
       - "8083:8083"
     networks:
