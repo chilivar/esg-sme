@@ -116,7 +116,7 @@ services:
 
   analytics-service:
     build:
-      context: ./analytics-service
+      context: ./analytics-service-pestel
       dockerfile: Dockerfile
     container_name: analytics_service
     restart: always
