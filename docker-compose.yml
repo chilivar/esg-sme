@@ -57,12 +57,16 @@ services:
       - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
 
   recsys:
-    image: yuribeton/recsystem
+    build:
+      context: ./RecomendationSystem
+      dockerfile: Dockerfile
     container_name: recomendation_system
     ports:
       - "5000:5000"
     networks:
       - shared_net
+    environment:
+      AI_KEY: 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
 
   mysql:
     image: mysql:8.0
