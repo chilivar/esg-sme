@@ -115,6 +115,9 @@ services:
       - shared_net
 
   analytics-service:
+    build:
+      context: ./analytics-service
+      dockerfile: Dockerfile
     image: chilivardev/analytics-service:latest
     container_name: analytics_service
     restart: always
@@ -142,6 +145,9 @@ services:
       - shared_net
 
   news-parser-service:
+    build:
+      context: ./news-parser-service
+      dockerfile: Dockerfile
     image: chilivardev/news-parser-service:latest
     container_name: news_parser_service
     restart: always
@@ -165,6 +171,9 @@ services:
       - shared_net
 
   mail-service:
+    build:
+      context: ./mail-service
+      dockerfile: Dockerfile
     image: chilivardev/mail-service:latest
     container_name: mail-service
     restart: always
