@@ -1,0 +1,204 @@
+services:
+  redis:
+    image: redis:7
+    restart: always
+    networks:
+      - shared_net
+
+  celery:
+      build: .
+      command: celery -A SDG_for_buisness worker -l info
+      restart: always
+      networks:
+        - shared_net
+      depends_on:
+        - redis
+      environment:
+        - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
+        - DATABASE_URL=mysql://admin:admin@db:3306/sdg
+        - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
+        - FRONT_URL=localhost:3000
+
+  db:
+    image: mysql:8
+    container_name: sdg_portal-db-1
+    restart: always
+    networks:
+      - shared_net
+    environment:
+      MYSQL_DATABASE: sdg
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data_gateway:/var/lib/mysql
+    healthcheck:
+        test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uadmin", "-padmin" ]
+        interval: 5s
+        timeout: 5s
+        retries: 10
+
+  web:
+    build: .
+    container_name: sdg_gateway
+    networks:
+      - shared_net
+    restart: always
+#    volumes:
+#      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
+      - DATABASE_URL=mysql://admin:admin@db:3306/sdg
+      - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
+      - FRONT_URL=localhost:3000
+
+  recsys:
+    image: yuribeton/recsystem
+    container_name: recomendation_system
+    restart: always
+    ports:
+      - "5000:5000"
+    networks:
+      - shared_net
+
+  mysql:
+    image: mysql:8.0
+    container_name: business_mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: business_sustainability
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3313:3306"
+    volumes:
+      - mysql_data_business:/var/lib/mysql
+      - ./db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - shared_net
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: business_phpmyadmin
+    restart: always
+    ports:
+      - "8082:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: root
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - shared_net
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: business_rabbit
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - shared_net
+
+  analytics-service:
+    image: chilivardev/analytics-service:latest
+    container_name: analytics_service
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/business_sustainability?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+      SPRINGDOC_API_DOCS_ENABLED: "true"
+      SPRINGDOC_SWAGGER_UI_ENABLED: "true"
+    ports:
+      - "8083:8083"
+    networks:
+      - shared_net
+
+  news-parser-service:
+    image: chilivardev/news-parser-service:latest
+    container_name: news_parser_service
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/business_sustainability?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRINGDOC_API_DOCS_ENABLED: "true"
+      SPRINGDOC_SWAGGER_UI_ENABLED: "true"
+      YANDEX_TRANSLATE_URL: https://translate.api.cloud.yandex.net/translate/v2/translate
+      YANDEX_TRANSLATE_FOLDER_ID: b1gp1g2mdlpi2c1hhmv4
+      YANDEX_TRANSLATE_API_KEY: AQVN3-a6J8IzFAX3EsxLnZgsQFrrhMjFVSlG_ES4
+    ports:
+      - "8081:8080"
+    networks:
+      - shared_net
+  mail-service:
+    image: chilivardev/mail-service:latest
+    container_name: mail-service
+    restart: always
+    environment:
+      MAIL_USERNAME: "portalcur@gmail.com"
+      MAIL_PASSWORD: "smla qvcj jbkf dapb"
+      MAILING_USERS_API_KEY: "0e56293c53afb5937cbbc9cd7d8975b810d5b60e732b49e5be6313533d2ce7e9"
+      MAILING_USERS_URL: "http://web:8000/api/mailing-users/"
+    ports:
+      - "8089:8089"
+    networks:
+      - shared_net
+
+  frontend:
+    image: avomi/dip-frontend:latest
+    container_name: dip-frontend-container
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    environment:
+      - REACT_APP_PORTAL_API_URL=http://localhost:8000
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:80" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - shared_net
+
+volumes:
+  mysql_data_gateway:
+  mysql_data_business:
+
+networks:
+  shared_net:
+    driver: bridge
