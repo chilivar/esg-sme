@@ -5,17 +5,19 @@ services:
       - shared_net
 
   celery:
-      image: drakenejivoy/sdg-celery:latest
-      command: celery -A SDG_for_buisness worker -l info
-      restart: always
-      networks:
-        - shared_net
-      depends_on:
-        - redis
-      environment:
-        - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
-        - DATABASE_URL=mysql://admin:admin@db:3306/sdg
-        - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
+    build: ./SDG_for_buisness
+    command: celery -A SDG_for_buisness worker -l info
+    restart: always
+    networks:
+      - shared_net
+    depends_on:
+      - redis
+    environment:
+      - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
+      - DATABASE_URL=mysql://admin:admin@db:3306/sdg
+      - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
+#      TODO ВАЖНО! ПОМЕНЯЙТИЕ НА ДОМЕННОЕ ИМЯ ФРОНТА
+      - FRONT_URL=localhost:3000
 
   db:
     image: mysql:8
@@ -39,13 +41,11 @@ services:
         retries: 10
 
   web:
-    image: drakenejivoy/sdg_gateway:latest
+    build: ./SDG_for_buisness
     container_name: sdg_gateway
     restart: always
     networks:
       - shared_net
-#    volumes:
-#      - .:/app
     ports:
       - "8000:8000"
     depends_on:
@@ -55,6 +55,8 @@ services:
       - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
       - DATABASE_URL=mysql://admin:admin@db:3306/sdg
       - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
+#     TODO ВАЖНО! ПОМЕНЯЙТИЕ НА ДОМЕННОЕ ИМЯ ФРОНТА
+      - FRONT_URL=localhost:3000
 
   recsys:
     build:
