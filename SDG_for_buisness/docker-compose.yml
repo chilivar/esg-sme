@@ -5,19 +5,18 @@ services:
       - shared_net
 
   celery:
-    build: ./SDG_for_buisness
-    command: celery -A SDG_for_buisness worker -l info
-    restart: always
-    networks:
-      - shared_net
-    depends_on:
-      - redis
-    environment:
-      - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
-      - DATABASE_URL=mysql://admin:admin@db:3306/sdg
-      - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
-#      TODO ВАЖНО! ПОМЕНЯЙТИЕ НА ДОМЕННОЕ ИМЯ ФРОНТА
-      - FRONT_URL=localhost:3000
+      image: drakenejivoy/sdg-celery:latest
+      command: celery -A SDG_for_buisness worker -l info
+      restart: always
+      networks:
+        - shared_net
+      depends_on:
+        - redis
+      environment:
+        - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
+        - DATABASE_URL=mysql://admin:admin@db:3306/sdg
+        - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
+        - FRONT_URL=localhost:3000
 
   db:
     image: mysql:8
@@ -41,11 +40,13 @@ services:
         retries: 10
 
   web:
-    build: ./SDG_for_buisness
+    image: drakenejivoy/sdg_gateway:latest
     container_name: sdg_gateway
     restart: always
     networks:
       - shared_net
+#    volumes:
+#      - .:/app
     ports:
       - "8000:8000"
     depends_on:
@@ -55,20 +56,15 @@ services:
       - DJANGO_SETTINGS_MODULE=SDG_for_buisness.docker
       - DATABASE_URL=mysql://admin:admin@db:3306/sdg
       - RECOMMENDATION_SERVICE_URL=http://recsys:5000/
-#     TODO ВАЖНО! ПОМЕНЯЙТИЕ НА ДОМЕННОЕ ИМЯ ФРОНТА
       - FRONT_URL=localhost:3000
 
   recsys:
-    build:
-      context: ./RecomendationSystem
-      dockerfile: Dockerfile
+    image: yuribeton/recsystem
     container_name: recomendation_system
     ports:
       - "5000:5000"
     networks:
       - shared_net
-    environment:
-      AI_KEY: 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
 
   mysql:
     image: mysql:8.0
@@ -121,9 +117,7 @@ services:
       - shared_net
 
   analytics-service:
-    build:
-      context: ./analytics-service-pestel
-      dockerfile: Dockerfile
+    image: chilivardev/analytics-service:latest
     container_name: analytics_service
     restart: always
     depends_on:
@@ -147,9 +141,7 @@ services:
       - shared_net
 
   news-parser-service:
-    build:
-      context: ./news-parser-service
-      dockerfile: Dockerfile
+    image: chilivardev/news-parser-service:latest
     container_name: news_parser_service
     restart: always
     depends_on:
@@ -172,9 +164,7 @@ services:
       - shared_net
 
   mail-service:
-    build:
-      context: ./Mail-Service
-      dockerfile: Dockerfile
+    image: chilivardev/mail-service:latest
     container_name: mail-service
     restart: always
     environment:
